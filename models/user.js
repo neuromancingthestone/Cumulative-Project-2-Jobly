@@ -115,10 +115,41 @@ class User {
     return result.rows;
   }
 
+  /** Allow user to apply for job id.
+   *
+   * Returns [{ username, job_id }]
+   *
+   * Throws BadRequestError if user has already applied for job.
+   **/
+
+  static async apply(username, id) {
+    // See if the user has already applied for the job
+    const dupCheck = await db.query(
+      `SELECT username FROM applications
+        WHERE username = $1
+        AND job_id = $2`,
+        [username, id]);
+    
+    if(dupCheck.rows[0]) {
+      throw new BadRequestError(`User ${username} has already applied for job id ${id}`);
+    }
+
+    const result = await db.query(
+      `INSERT INTO applications
+        (username, job_id)
+        VALUES
+        ($1, $2)
+        RETURNING username, job_id`,
+        [username, id]
+    );
+
+    return result.rows[0];
+  }
+
   /** Given a username, return data about user.
    *
-   * Returns { username, first_name, last_name, is_admin, jobs }
-   *   where jobs is { id, title, company_handle, company_name, state }
+   * Returns { username, first_name, last_name, is_admin, jobs: [] }
+   *   where jobs is a list of all jobs applied for by user [job_id, ...]
    *
    * Throws NotFoundError if user not found.
    **/
@@ -139,7 +170,22 @@ class User {
 
     if (!user) throw new NotFoundError(`No user: ${username}`);
 
-    return user;
+    const userJobs = await db.query(
+      `SELECT job_id FROM applications
+        WHERE username = $1`,
+        [username]);
+
+    var jobArr = userJobs.rows.map(m => {
+      return m.job_id;
+    })
+
+    return { 
+      username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      jobs: jobArr };
   }
 
   /** Update user data with `data`.

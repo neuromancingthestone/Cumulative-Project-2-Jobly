@@ -59,6 +59,14 @@ router.get("/", async function (req, res, next) {
       const errs = validator.errors.map(e => e.stack);
       throw new BadRequestError(errs);
     }    
+    
+    // Error if query string minEmployees is greater than maxEmployees
+    if(req.query.minEmployees > req.query.maxEmployees){
+      throw new BadRequestError("minEmployees cannot be greater than maxEmployees");
+    }
+
+    // If no query string passed in, then run findAll() to return full list
+    // Else queryAll() to find the companies that match the filter
     if(Object.keys(req.query).length === 0) {   
       const companies = await Company.findAll();
       return res.json({ companies });      

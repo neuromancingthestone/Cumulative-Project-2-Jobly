@@ -1,3 +1,4 @@
+const e = require("express");
 const { BadRequestError } = require("../expressError");
 
 // THIS NEEDS SOME GREAT DOCUMENTATION.
@@ -39,20 +40,31 @@ function sqlForPartialUpdate(dataToUpdate, jsToSql) {
   };
 }
 
+// Function: sqlForAllQuery
+//
+// Description: 
+//  Create the SQL query string that will filter different companies
+//  with criteria passed in dataToQuery.
+//  Return the string and data to pass into the database query.
+//
+//  dataToQuery - {name, minEmployees, maxEmployees}
+
 function sqlForAllQuery(dataToQuery) {
   const keys = Object.keys(dataToQuery);
   if (keys.length === 0) throw new BadRequestError("No data");
 
-  // {firstName: 'Aliya', age: 32} => ['"first_name"=$1', '"age"=$2']
+  // Parse keys and create search string
+  // {name: 'hall', minEmployees: 400} => 
+  // [LOWER(name) LIKE '%' || LOWER($1) || '%' AND num_employees > $2']
   const cols = keys.map(function test(colName, idx) {
     if(colName === 'name') {
       return `LOWER(${colName}) LIKE '%' || LOWER($${idx+1}) || '%'`
-    } else {}
+    } 
     if(colName === 'minEmployees') {
       return `num_employees >= $${idx+1}`
     }
     if(colName === 'maxEmployees') {
-      return `num_employees < $${idx+1}`
+      return `num_employees <= $${idx+1}`
     }
   });
 
@@ -62,4 +74,46 @@ function sqlForAllQuery(dataToQuery) {
   };
 }
 
-module.exports = { sqlForPartialUpdate, sqlForAllQuery };
+// Function: sqlJobsQuery
+//
+// Description: 
+//  Create the SQL query string that will filter different jobs
+//  with criteria passed in dataToQuery.
+//  Return the string and data to pass into the database query.
+//
+//  dataToQuery - {title, minSalary, hasEquity}
+
+function sqlJobsQuery(dataToQuery) {
+  const keys = Object.keys(dataToQuery);
+  if (keys.length === 0) throw new BadRequestError("No data");
+
+  // Parse keys and create search string
+  // {title: 'info', minSalary: 40000} => 
+  // [LOWER(title) LIKE '%' || LOWER($1) || '%' AND salary > $2']
+  const cols = keys.map(function test(colName, idx) {
+    if(colName === 'title') {
+      return `LOWER(${colName}) LIKE '%' || LOWER($${idx+1}) || '%'`;
+    } 
+    if(colName === 'minSalary') {
+      return `salary >= $${idx+1}`;
+    }
+    if(colName === 'hasEquity') {
+      if(dataToQuery.hasEquity === "true") {       
+        dataToQuery.hasEquity = 0;
+        return `equity > $${idx+1}`;
+      } else if(dataToQuery.hasEquity === "false") {       
+        dataToQuery.hasEquity = 0;
+        return `(equity = $${idx+1} OR equity IS NULL)`;
+      } else {
+        throw new BadRequestError("Invalid type, hasEquity must be true or false.");        
+      }
+    }
+  });
+
+  return {
+    setCols: cols.join(" AND "),
+    values: Object.values(dataToQuery),
+  };
+}
+
+module.exports = { sqlForPartialUpdate, sqlForAllQuery, sqlJobsQuery };
